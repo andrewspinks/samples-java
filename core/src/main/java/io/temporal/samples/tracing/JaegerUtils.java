@@ -5,6 +5,9 @@ import io.jaegertracing.internal.reporters.RemoteReporter;
 import io.jaegertracing.internal.samplers.ConstSampler;
 import io.jaegertracing.spi.Sampler;
 import io.jaegertracing.thrift.internal.senders.UdpSender;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
@@ -24,6 +27,13 @@ import java.util.concurrent.TimeUnit;
 import org.apache.thrift.transport.TTransportException;
 
 public class JaegerUtils {
+
+  private static OpenTelemetry openTelemetry;
+
+  /** Returns the OpenTelemetry instance configured by {@link #getJaegerOptions}. */
+  public static OpenTelemetry getOpenTelemetry() {
+    return openTelemetry;
+  }
 
   public static OpenTracingOptions getJaegerOptions(String type) {
     if (type.equals("OpenTracing")) {
@@ -70,17 +80,22 @@ public class JaegerUtils {
             .setResource(Resource.getDefault().merge(serviceNameResource))
             .build();
 
-    OpenTelemetrySdk openTelemetry =
+    OpenTelemetrySdk sdk =
         OpenTelemetrySdk.builder()
             .setPropagators(
                 ContextPropagators.create(
                     TextMapPropagator.composite(
-                        W3CTraceContextPropagator.getInstance(), JaegerPropagator.getInstance())))
+                        W3CTraceContextPropagator.getInstance(),
+                        W3CBaggagePropagator.getInstance(),
+                        JaegerPropagator.getInstance())))
             .setTracerProvider(tracerProvider)
             .build();
 
+    openTelemetry = sdk;
+    GlobalOpenTelemetry.set(sdk);
+
     // create OpenTracing shim and return OpenTracing Tracer from it
-    return getOpenTracingOptionsForTracer(OpenTracingShim.createTracerShim(openTelemetry));
+    return getOpenTracingOptionsForTracer(OpenTracingShim.createTracerShim(sdk));
   }
 
   private static OpenTracingOptions getOpenTracingOptionsForTracer(Tracer tracer) {

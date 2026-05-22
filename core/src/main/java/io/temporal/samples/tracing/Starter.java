@@ -1,5 +1,6 @@
 package io.temporal.samples.tracing;
 
+import io.opentelemetry.api.baggage.Baggage;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowClientOptions;
 import io.temporal.client.WorkflowOptions;
@@ -46,13 +47,23 @@ public class Starter {
     // Create typed workflow stub
     TracingWorkflow workflow = client.newWorkflowStub(TracingWorkflow.class, workflowOptions);
 
-    // Convert to untyped and start it with signalWithStart
-    WorkflowStub untyped = WorkflowStub.fromTyped(workflow);
-    untyped.signalWithStart("setLanguage", new Object[] {"Spanish"}, new Object[] {"John"});
+    // Set OTel Baggage before starting the workflow. The OpenTracingClientInterceptor creates
+    // its root span within this scope, so the baggage is active when the span is built.
+    // The shim bridges OTel Baggage to OpenTracing baggage items, which are then serialized
+    // into Temporal headers by the Jaeger codec and deserialized on the worker side.
+    // See README.md for notes on the shim and when this approach has limitations.
+    try (io.opentelemetry.context.Scope baggageScope =
+        Baggage.builder()
+            .put("user-id", "user-123")
+            .put("correlation-id", "req-abc")
+            .build()
+            .makeCurrent()) {
+      WorkflowStub untyped = WorkflowStub.fromTyped(workflow);
+      untyped.signalWithStart("setLanguage", new Object[] {"Spanish"}, new Object[] {"John"});
 
-    String greeting = untyped.getResult(String.class);
-
-    System.out.println("Greeting: " + greeting);
+      String greeting = untyped.getResult(String.class);
+      System.out.println("Greeting: " + greeting);
+    }
 
     System.exit(0);
   }

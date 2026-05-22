@@ -44,7 +44,8 @@ public class TracingWorker {
     Worker worker = factory.newWorker(TASK_QUEUE_NAME);
     worker.registerWorkflowImplementationTypes(
         TracingWorkflowImpl.class, TracingChildWorkflowImpl.class);
-    worker.registerActivitiesImplementations(new TracingActivitiesImpl());
+    worker.registerActivitiesImplementations(
+        new TracingActivitiesImpl(JaegerUtils.getOpenTelemetry()));
 
     factory.start();
   }
