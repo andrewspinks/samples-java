@@ -19,32 +19,30 @@ docker run -d -p 5775:5775/udp -p 14250:14250 -p 16686:16686 -p 14268:14268 jaeg
 This starts Jaeger with udp port 5775 and grpc port 14250. Note that 
 if these ports are different in your setup to reflect the changes in [JagerUtils](JaegerUtils.java).
 
-1. Start the Worker:
+1. Download the agent
+```bash
+curl -L -o opentelemetry-javaagent.jar \
+  https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+```
+
+2. Start the Worker:
 
 * For OpenTelemetry:
 
 ```bash
-./gradlew -q execute -PmainClass=io.temporal.samples.opentracing.TracingWorker
+./gradlew -q execute \
+  -PmainClass=io.temporal.samples.tracing.TracingWorker \
+  "-PjvmArgs=-javaagent:$(pwd)/opentelemetry-javaagent.jar -Dotel.service.name=temporal-sample -Dotel.exporter.otlp.endpoint=http://localhost:14250 -Dotel.exporter.otlp.protocol=grpc -Dotel.instrumentation.grpc.enabled=false"
 ```
 
-* For OpenTracing:
-
-```bash
-./gradlew -q execute -PmainClass=io.temporal.samples.opentracing.TracingWorker --args="OpenTracing"
-```
-
-2. Start the Starter
+3. Start the Starter
 
 * For OpenTelemetry
 
 ```bash
-./gradlew -q execute -PmainClass=io.temporal.samples.opentracing.Starter
-```
-
-* For OpenTracing
-
-```bash
-./gradlew -q execute -PmainClass=io.temporal.samples.opentracing.Starter --args="OpenTracing"
+./gradlew -q execute \
+   -PmainClass=io.temporal.samples.tracing.Starter \
+   "-PjvmArgs=-javaagent:$(pwd)/opentelemetry-javaagent.jar -Dotel.service.name=temporal-sample -Dotel.exporter.otlp.endpoint=http://localhost:14250 -Dotel.exporter.otlp.protocol=grpc -Dotel.instrumentation.grpc.enabled=false"
 ```
 
 3. Go to your Jaeger UI on [http://127.0.0.1:16686/search](http://127.0.0.1:16686/search)
